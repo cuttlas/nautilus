@@ -1,0 +1,35 @@
+{
+  "name": "nautilus",
+  "version": "0.1.0",
+  "description": "Telegram-controlled AI research tool that autonomously builds comprehensive static websites from deep web research",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "env:save": "cp .env ~/.nautilus-env && echo 'Saved .env to ~/.nautilus-env'",
+    "env:restore": "cp ~/.nautilus-env .env && echo 'Restored .env from ~/.nautilus-env'"
+  },
+  "dependencies": {
+    "ai": "^5.0.0",
+    "@ai-sdk/anthropic": "^2.0.0",
+    "@tavily/core": "^0.0.3",
+    "grammy": "^1.35.0",
+    "@grammyjs/conversations": "^2.0.3",
+    "simple-git": "^3.27.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.24.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
