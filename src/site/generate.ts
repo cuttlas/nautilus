@@ -34,11 +34,7 @@ interface TocSectionSummary {
     inProgress: number;
     failed: number;
   };
-  subsections: Array<{
-    slug: string;
-    title: string;
-    tasks: TocTaskSummary[];
-  }>;
+  tasks: TocTaskSummary[];
 }
 
 function asJsonFile(data: unknown): string {
@@ -68,7 +64,7 @@ function buildSectionSummary(input: {
     title: string;
     description: string;
     order: number;
-    subsections: Array<{ slug: string; title: string; taskIds: string[] }>;
+    taskIds: string[];
   };
   taskById: Map<string, ResearchTask>;
 }): TocSectionSummary {
@@ -80,30 +76,22 @@ function buildSectionSummary(input: {
     failed: 0,
   };
 
-  const subsections = input.section.subsections.map((subsection) => {
-    const tasks = subsection.taskIds.map((taskId) => {
-      const task = input.taskById.get(taskId);
-      const status = taskToStatus(task);
-      const route = taskToRoute(task);
+  const tasks = input.section.taskIds.map((taskId) => {
+    const task = input.taskById.get(taskId);
+    const status = taskToStatus(task);
+    const route = taskToRoute(task);
 
-      stats.total += 1;
-      if (status === 'completed') stats.completed += 1;
-      if (status === 'queued') stats.queued += 1;
-      if (status === 'in_progress') stats.inProgress += 1;
-      if (status === 'failed') stats.failed += 1;
-
-      return {
-        id: taskId,
-        title: task?.title ?? `Missing task (${taskId.slice(0, 8)})`,
-        status,
-        route,
-      };
-    });
+    stats.total += 1;
+    if (status === 'completed') stats.completed += 1;
+    if (status === 'queued') stats.queued += 1;
+    if (status === 'in_progress') stats.inProgress += 1;
+    if (status === 'failed') stats.failed += 1;
 
     return {
-      slug: subsection.slug,
-      title: subsection.title,
-      tasks,
+      id: taskId,
+      title: task?.title ?? `Missing task (${taskId.slice(0, 8)})`,
+      status,
+      route,
     };
   });
 
@@ -113,7 +101,7 @@ function buildSectionSummary(input: {
     description: input.section.description,
     order: input.section.order,
     stats,
-    subsections,
+    tasks,
   };
 }
 

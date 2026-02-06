@@ -56,6 +56,10 @@ async function runHeartbeatCycle(input: HeartbeatDependencies): Promise<void> {
 
   const task = backlog.tasks.find((candidate) => candidate.status === 'queued');
   if (!task) {
+    if (backlog.tasks.length === 0) {
+      console.log('[heartbeat] skipping: backlog is empty (waiting for /add)');
+      return;
+    }
     project.status = 'completed';
     project.updatedAt = new Date().toISOString();
     await writeProject(input.repo, project);

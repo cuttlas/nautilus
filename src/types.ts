@@ -13,18 +13,12 @@ export interface Backlog {
   tasks: ResearchTask[];
 }
 
-export interface SchemaSubsection {
-  slug: string;
-  title: string;
-  taskIds: string[];
-}
-
 export interface SchemaSection {
   slug: string;
   title: string;
   description: string;
   order: number;
-  subsections: SchemaSubsection[];
+  taskIds: string[];
 }
 
 export interface DocumentSchema {
@@ -38,7 +32,6 @@ export interface Project {
   slug: string;
   title: string;
   scope: string;
-  scopingAnswers: Record<string, string>;
   status: 'scoping' | 'active' | 'paused' | 'completed';
   heartbeatIntervalMinutes: number;
   model: string;

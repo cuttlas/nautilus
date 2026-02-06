@@ -107,7 +107,6 @@ interface Project {
   slug: string;                       // URL-safe name, e.g., "sea-nomad"
   title: string;                      // "Digital Nomading in SE Asia"
   scope: string;                      // Full scope description (from scoping conversation)
-  scopingAnswers: Record<string, string>; // Q&A from scoping phase
   status: 'scoping' | 'active' | 'paused' | 'completed';
   heartbeatIntervalMinutes: number;   // Default: 30
   model: string;                      // Default: "claude-sonnet-4-5-20250929"
@@ -152,12 +151,6 @@ interface SchemaSection {
   title: string;                      // "Visas & Immigration"
   description: string;                // What this section covers
   order: number;                      // Display order
-  subsections: SchemaSubsection[];
-}
-
-interface SchemaSubsection {
-  slug: string;                       // "thailand"
-  title: string;                      // "Thailand"
   taskIds: string[];                  // Links to backlog tasks
 }
 ```
@@ -191,27 +184,33 @@ Content goes here...
 
 **Steps:**
 
-1. Bot creates a new project in `scoping` status.
-2. Bot enters a scoping conversation. It uses `generateText` with a system prompt that instructs Claude to ask questions one at a time to fully understand the research scope. Key areas to probe:
+1. Bot checks if an active/paused/scoping project already exists. If so, asks user to complete or archive it first.
+2. Bot enters a scoping conversation. It uses `generateObject` with a structured schema to ask questions one at a time and understand the research scope. Key areas to probe:
    - Personal context (nationality, budget, timeline, work situation)
    - Geographic scope (which countries/cities)
    - Priority topics (what matters most)
    - Existing knowledge (what they already know, to avoid redundancy)
-3. Each user reply is sent back to Claude (maintaining conversation history). Claude signals it has enough information by calling a `scopingComplete` tool (a tool with no `execute` function, similar to the `done` pattern in the research agent).
+3. Each user reply is sent back to the LLM (maintaining conversation history). The LLM signals it has enough information via a `isComplete: true` field in its structured output.
 4. Once scoping is complete, use `generateObject` to produce:
-   - A `scope` summary text
-   - A `DocumentSchema` with sections and subsections
-   - An initial `Backlog` of research tasks (targeting 30-60 small, focused tasks)
-5. Bot sends a summary to Telegram: sections, task count per section, and confirms research will begin.
-6. Project status changes to `active`. State is committed and pushed to git.
-7. The Astro site boilerplate is scaffolded into the `site/` directory (copied from a template bundled in the Nautilus source code) and pushed alongside the initial project state. This ensures Cloudflare Pages can build immediately.
+   - A project `title`
+   - A comprehensive `scope` description
+5. Bot creates the project scaffolding:
+   - Empty `backlog.json` (`{ tasks: [] }`)
+   - Empty `schema.json` (`{ title, description: scope, sections: [] }`)
+   - `project.json` with status `active`
+   - Astro site boilerplate in `site/` directory
+6. State is committed and pushed to git (triggers Cloudflare Pages build).
+7. Bot sends a project summary to Telegram: title, slug, and instructions to use `/add`.
+8. Bot runs a blindspot analysis and sends initial topic suggestions to help the user get started with `/add`.
+
+**Design rationale**: `/new` only creates scope — no sections, no tasks. Sections and tasks are created incrementally via `/add` and informed by blindspot analysis. This gives the user full control over what gets researched.
 
 **Scoping System Prompt Guidelines:**
 - Ask one question at a time (Telegram is a chat interface, not a form)
 - Be conversational, not bureaucratic
 - Infer what you can (e.g., if they say "EU passport", infer Schengen rules apply)
 - After 5-10 questions, check if the user wants to add anything else
-- When creating tasks, each task should be specific enough to research in 15-25 AI turns
+- Focus on producing a thorough scope description — this scope is used by blindspot analysis and `/add` to make smart decisions
 
 ### Flow 2: Research Heartbeat
 
@@ -222,7 +221,9 @@ Content goes here...
 1. Check project status. Skip if `paused` or `completed`.
 2. Check if a task is already `in_progress`. If so, skip this heartbeat (previous research is still running).
 3. Pick the next `queued` task (FIFO — first in, first out).
-3. If no tasks remain, set project status to `completed` and notify user.
+3. If no queued tasks remain:
+   - If the backlog is completely empty (no tasks at all), skip — the project is waiting for `/add`.
+   - If the backlog has tasks but none are queued, set project status to `completed` and notify user.
 4. Mark task as `in_progress`.
 5. Build the research prompt:
    - Include the project scope for context
@@ -268,18 +269,47 @@ Content goes here...
 **Steps:**
 
 1. Use `generateObject` to parse the user's free-text input into a structured `ResearchTask`:
-   - Map to an existing category from `schema.json`, or create a new one if no category fits.
-   - Generate a detailed `description` for the AI researcher.
-2. If a new category was created, update `schema.json` with the new section.
+   - The LLM receives the project scope and existing schema sections as context.
+   - It maps the topic to an existing section if one fits, or signals that a new section should be created (via a `__new__` sentinel slug with title and description).
+   - It generates a concise `title` and actionable `description` for the AI researcher.
+2. Resolve the target section:
+   - If the LLM matched an existing slug, find the section (using loose slug matching — matches by slug or slugified title).
+   - If no match is found or the LLM requested a new section, create a new `SchemaSection` with an auto-generated slug, the requested title/description, and an empty `taskIds` array.
 3. Add the task to the **front** of the backlog (so it's researched next).
-4. Commit and push.
-5. Confirm to user on Telegram. If a new category was created, mention it:
+4. Add the task ID to the section's `taskIds` array and write the updated schema.
+5. If the project was `completed`, reactivate it to `active` status.
+6. Commit and push.
+7. Confirm to user on Telegram:
 
 ```
-Added to backlog: Pet relocation requirements to Thailand
-📁 New category created: "Pets & Animals"
+Added to backlog: SIM cards and local phone numbers in SE Asia
 It will be researched in the next heartbeat cycle.
 ```
+
+If the project is paused, the reply notes that `/resume` is needed.
+
+### Flow 4: Blindspot Analysis
+
+**Triggers:**
+- Automatically after `/new` creates a project (immediate suggestions to help user start adding tasks).
+- On-demand via `/blindspot` command.
+- Periodically via a blindspot heartbeat timer (configurable interval, independent from the research heartbeat).
+
+**Steps:**
+
+1. Read `project.json`, `schema.json`, and `backlog.json`.
+2. Build a context prompt including: project scope, existing schema sections, completed task titles, and queued task titles.
+3. Use `generateObject` to ask the LLM for blindspot suggestions — topics that are missing or under-covered given the project scope.
+4. Each suggestion includes a `title` and `rationale` explaining why it's a gap.
+5. Send suggestions to Telegram with instructions to use `/add` for any that interest the user.
+
+**Guidelines for the blindspot LLM:**
+- Focus on practical day-to-day concerns a first-timer wouldn't know to ask about
+- Identify cross-cutting concerns that span multiple categories
+- Highlight recent developments or changes (2025-2026)
+- Surface edge cases and common gotchas
+- Do not suggest topics already covered by completed or queued tasks
+- Each suggestion must be specific enough for one research cycle
 
 ---
 
@@ -293,13 +323,14 @@ Use [grammy](https://grammy.dev/) — a modern, TypeScript-first Telegram bot fr
 
 | Command | Description | Response |
 |---|---|---|
-| `/new <topic>` | Start a new research project | Begins scoping conversation |
-| `/add <topic>` | Add a research topic to backlog | Confirms task was added |
+| `/new <topic>` | Start a new research project | Begins scoping conversation, creates scope-only project |
+| `/add <topic>` | Add a research topic to backlog | Creates task + section if needed, confirms added |
 | `/status` | Show project status | Tasks completed/total, next task, last activity |
 | `/site` | Get link to the generated website | Sends the Cloudflare Pages URL |
 | `/pause` | Pause the research heartbeat | Confirms paused |
 | `/resume` | Resume the research heartbeat | Confirms resumed, shows next task |
 | `/backlog` | Show pending tasks summary | Lists queued tasks grouped by category |
+| `/blindspot` | Run blindspot analysis | Suggests under-researched topics based on scope and coverage |
 | `/help` | Show available commands | Lists commands with descriptions |
 
 ### Conversation State
@@ -402,8 +433,8 @@ The Astro site is a standard project living inside the git repo (`site/` directo
 
 ### Pages
 
-- **Index page**: Auto-generated table of contents from `schema.json`. Shows all sections, subsections, and their completion status (researched vs. pending).
-- **Section pages**: Lists all topics within a category.
+- **Index page**: Auto-generated table of contents from `schema.json`. Shows all sections and their tasks with completion status (researched vs. pending).
+- **Section pages**: Lists all topics within a section.
 - **Topic pages**: The actual researched content, rendered from markdown. Includes:
   - Last researched timestamp
   - Source links
@@ -433,6 +464,7 @@ interface NautilusConfig {
   dataRepoUrl: string;                // From env: DATA_REPO_URL (e.g., "user/sea-nomad")
   defaultModel: string;               // From env or default: "claude-sonnet-4-5-20250929"
   heartbeatIntervalMinutes: number;   // From env or default: 30
+  blindspotIntervalMinutes: number;   // From env or default: 360 (6 hours)
   maxStepsPerTask: number;            // From env or default: 25
   siteUrl: string;                    // From env: SITE_URL (Cloudflare Pages URL)
 }
@@ -457,24 +489,31 @@ SITE_URL=https://sea-nomad.pages.dev # The project's Cloudflare Pages URL
 ```
 nautilus/
 ├── src/
-│   ├── index.ts                     # Entry point: starts bot + heartbeat
+│   ├── index.ts                     # Entry point: starts bot + heartbeats
 │   ├── bot/
 │   │   ├── bot.ts                   # grammy bot setup and command handlers
 │   │   ├── commands/
 │   │   │   ├── new.ts               # /new command + scoping conversation
 │   │   │   ├── add.ts               # /add command
+│   │   │   ├── blindspot.ts         # /blindspot command
 │   │   │   ├── status.ts            # /status command
 │   │   │   └── ...
 │   │   └── notifications.ts         # Outbound Telegram messages
+│   ├── blindspot/
+│   │   ├── analyzer.ts              # Blindspot analysis LLM logic
+│   │   └── heartbeat.ts             # Periodic blindspot timer
 │   ├── research/
-│   │   ├── heartbeat.ts             # Heartbeat timer + task picker
+│   │   ├── heartbeat.ts             # Research heartbeat timer + task picker
 │   │   ├── agent.ts                 # ToolLoopAgent setup + research execution
 │   │   ├── tools.ts                 # Web search + web fetch tool definitions
 │   │   └── prompts.ts               # System prompts and prompt builders
 │   ├── project/
-│   │   ├── scoping.ts               # Scoping conversation logic
+│   │   ├── scoping.ts               # Scoping conversation logic (title + scope only)
 │   │   ├── backlog.ts               # Backlog management (add, pick, update)
-│   │   └── schema.ts                # Document schema management
+│   │   └── schema.ts                # Document schema read/write/find
+│   ├── site/
+│   │   ├── generate.ts              # Generates toc.json and Astro content artifacts
+│   │   └── scaffold.ts              # Astro site boilerplate (components, layouts)
 │   ├── content/
 │   │   ├── writer.ts                # Write markdown content files
 │   │   └── frontmatter.ts           # Frontmatter generation
@@ -521,7 +560,6 @@ This separation keeps the application code and the generated data/content in dif
 - **Single project only**: The MVP supports one active project at a time. Multi-project is a future extension.
 - **Single user**: One Telegram chat ID. No multi-user auth.
 - **No content revision**: The MVP generates content once per task. Editing/revision is a future extension.
-- **No blindspot detection**: The blindspot heartbeat is a future extension.
 - **No cost tracking**: API costs are not tracked in the MVP. Use Anthropic Console dashboard.
 - **No auto task splitting**: Tasks are created as-is. If a task is too broad, it may produce shallow content.
 - **English only**: Content is generated in English.

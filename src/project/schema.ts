@@ -18,17 +18,6 @@ export async function writeSchema(
   await repo.writeJSON(SCHEMA_FILE, schema);
 }
 
-export async function addSection(
-  repo: DataRepo,
-  section: SchemaSection,
-): Promise<DocumentSchema> {
-  const schema = await readSchema(repo);
-  schema.sections.push(section);
-  schema.sections.sort((a, b) => a.order - b.order);
-  await repo.writeJSON(SCHEMA_FILE, schema);
-  return schema;
-}
-
 export function findSectionBySlug(
   schema: DocumentSchema,
   slug: string,
