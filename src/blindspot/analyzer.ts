@@ -45,7 +45,6 @@ function buildSchemaSummary(schema: {
     slug: string;
     title: string;
     description: string;
-    subsections: Array<{ slug: string; title: string }>;
   }>;
 }): string {
   return JSON.stringify(
@@ -53,10 +52,6 @@ function buildSchemaSummary(schema: {
       slug: s.slug,
       title: s.title,
       description: s.description,
-      subsections: s.subsections.map((sub) => ({
-        slug: sub.slug,
-        title: sub.title,
-      })),
     })),
     null,
     2,
@@ -74,7 +69,7 @@ function buildContextPrompt(input: {
     'Project scope:',
     input.projectScope,
     '',
-    'Document schema (categories and subsections):',
+    'Document schema (categories):',
     input.schemaSummary,
     '',
     'Completed tasks:',

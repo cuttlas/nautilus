@@ -23,18 +23,11 @@ export const SCOPING_SYSTEM_PROMPT =
 
 export const SCOPING_PLAN_SYSTEM_PROMPT =
   [
-    'You design a project bootstrap package for Nautilus.',
+    'You generate a project title and comprehensive scope description for Nautilus.',
     'Return only valid structured output that matches the schema exactly.',
     'Do not include markdown, prose wrappers, or keys that are not in schema.',
-    'Use specific, actionable language and realistic section structure.',
-  ].join('\n');
-
-export const SCOPING_TASKS_SYSTEM_PROMPT =
-  [
-    'You create the initial backlog tasks for a Nautilus project.',
-    'Return only valid structured output that matches the schema exactly.',
-    'Each task must be specific, practical, and completable in one research cycle.',
-    'Each task must reference an existing schema slug exactly.',
+    'The title should be concise and descriptive.',
+    'The scope should be a thorough description of what will be researched, including key areas of focus and practical goals.',
   ].join('\n');
 
 export function buildScopingTurnPrompt(input: {
@@ -62,52 +55,19 @@ export function buildScopingTurnPrompt(input: {
 export function buildScopingPlanPrompt(input: {
   topic: string;
   conversation: string;
-  minSections: number;
-  maxSections: number;
 }): string {
   return [
-    'Create the initial project package for Nautilus.',
+    'Generate a project title and scope for Nautilus.',
     'Hard constraints:',
     '- Follow the schema exactly. Do not omit required keys.',
     '- Do not output markdown or extra commentary.',
-    `- Create between ${input.minSections} and ${input.maxSections} sections.`,
-    '- Each section must contain at least one subsection.',
-    '- Slugs must be lowercase kebab-case and concise.',
-    '- Descriptions must be concrete and practical.',
+    '- The title should be concise (under 60 characters) and descriptive.',
+    '- The scope should be comprehensive (at least 2-3 sentences) covering key areas of focus, practical goals, and boundaries of the research.',
     '',
     `Topic: ${input.topic}`,
     '',
     'Conversation transcript:',
     input.conversation,
-  ].join('\n');
-}
-
-export function buildScopingTasksPrompt(input: {
-  topic: string;
-  projectTitle: string;
-  projectScope: string;
-  schemaSummaryJson: string;
-  targetTasks: number;
-  minTasks: number;
-  maxTasks: number;
-}): string {
-  return [
-    'Create the initial backlog tasks for this project.',
-    'Hard constraints:',
-    '- Follow the schema exactly. Do not omit required keys.',
-    '- Do not output markdown or extra commentary.',
-    `- Return around ${input.targetTasks} tasks (between ${input.minTasks} and ${input.maxTasks}).`,
-    '- Use categorySlug and subsectionSlug values exactly from the provided schema list.',
-    '- Do not invent new slugs.',
-    '- Avoid duplicate or overlapping tasks.',
-    '- Each task should be narrow enough for one research cycle.',
-    '',
-    `Project topic: ${input.topic}`,
-    `Project title: ${input.projectTitle}`,
-    `Project scope: ${input.projectScope}`,
-    '',
-    'Allowed categories and subsections (JSON):',
-    input.schemaSummaryJson,
   ].join('\n');
 }
 

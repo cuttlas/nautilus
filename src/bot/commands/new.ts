@@ -1,4 +1,5 @@
 import type { Bot } from 'grammy';
+import { analyzeBlindspots, type BlindspotSuggestion } from '../../blindspot/analyzer.js';
 import {
   finalizeScoping,
   MAX_SCOPING_QUESTIONS,
@@ -23,23 +24,29 @@ function parseTopic(text: string): string {
 function formatProjectSummary(input: {
   title: string;
   slug: string;
-  taskCount: number;
-  sections: Array<{ title: string; taskCount: number }>;
 }): string {
-  const sectionLines = input.sections.map(
-    (section, index) => `${index + 1}. ${section.title} (${section.taskCount} tasks)`,
-  );
-
   return [
     `Project initialized: ${input.title}`,
     `Slug: ${input.slug}`,
-    `Total tasks: ${input.taskCount}`,
     '',
-    'Sections:',
-    ...sectionLines,
-    '',
-    'Research will start on the next heartbeat cycle.',
+    'Use /add <topic> to start adding research tasks.',
+    'Research will begin on the next heartbeat after tasks are added.',
   ].join('\n');
+}
+
+function formatBlindspotSuggestions(suggestions: BlindspotSuggestion[]): string {
+  const lines = [`Here are some initial topic suggestions (${suggestions.length}):`];
+
+  for (let i = 0; i < suggestions.length; i++) {
+    const s = suggestions[i];
+    lines.push('');
+    lines.push(`${i + 1}. ${s.title}`);
+    lines.push(`   ${s.rationale}`);
+  }
+
+  lines.push('');
+  lines.push('Use /add <topic> to research any of these.');
+  return lines.join('\n');
 }
 
 function formatErrorMessage(error: unknown): string {
@@ -62,9 +69,6 @@ export function createScopingConversation(deps: BotDependencies) {
     const history: Array<{ role: 'assistant' | 'user'; content: string }> = [
       { role: 'user', content: topic },
     ];
-    const scopingAnswers: Record<string, string> = {
-      topic,
-    };
 
     await ctx.reply(
       [
@@ -113,7 +117,6 @@ export function createScopingConversation(deps: BotDependencies) {
         return;
       }
 
-      scopingAnswers[`answer_${askedQuestions + 1}`] = answer;
       history.push({ role: 'user', content: answer });
       askedQuestions += 1;
       ctx = nextCtx;
@@ -130,14 +133,13 @@ export function createScopingConversation(deps: BotDependencies) {
         const result = await finalizeScoping(deps.repo, deps.config, {
           topic,
           history,
-          scopingAnswers,
         });
 
         await deps.repo.commitAndPush(`Initialize project from /new: ${result.project.slug}`);
         return result;
       });
       console.log(
-        `[new] finalized project ${contextTag(ctx)} slug=${finalized.project.slug} tasks=${finalized.taskCount}`,
+        `[new] finalized project ${contextTag(ctx)} slug=${finalized.project.slug}`,
       );
     } catch (error) {
       console.error('Failed to finalize /new project:', error);
@@ -149,10 +151,19 @@ export function createScopingConversation(deps: BotDependencies) {
       formatProjectSummary({
         title: finalized.project.title,
         slug: finalized.project.slug,
-        taskCount: finalized.taskCount,
-        sections: finalized.sections,
       }),
     );
+
+    try {
+      const suggestions = await conversation.external(() =>
+        analyzeBlindspots({ config: deps.config, repo: deps.repo }),
+      );
+      if (suggestions.length > 0) {
+        await ctx.reply(formatBlindspotSuggestions(suggestions));
+      }
+    } catch (error) {
+      console.error('[new] post-creation blindspot analysis failed:', error);
+    }
   };
 }
 
