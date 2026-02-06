@@ -89,3 +89,21 @@ export async function updateTask(
   await repo.writeJSON(BACKLOG_FILE, backlog);
   return task;
 }
+
+export async function requeueInProgressTasks(repo: DataRepo): Promise<number> {
+  const backlog = await readBacklog(repo);
+  let updatedCount = 0;
+
+  for (const task of backlog.tasks) {
+    if (task.status === 'in_progress') {
+      task.status = 'queued';
+      updatedCount += 1;
+    }
+  }
+
+  if (updatedCount > 0) {
+    await repo.writeJSON(BACKLOG_FILE, backlog);
+  }
+
+  return updatedCount;
+}

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createBot } from './bot/bot.js';
 import { loadConfig } from './config.js';
 import { getDataRepo } from './git/sync.js';
+import { startHeartbeat } from './research/heartbeat.js';
 
 async function main() {
   console.log('Nautilus starting...');
@@ -13,11 +14,14 @@ async function main() {
   console.log(`Data repo ready at: ${repo.getLocalPath()}`);
 
   const bot = createBot({ config, repo });
+  const heartbeat = startHeartbeat({ config, repo, bot });
+
   let stopping = false;
   const stopBot = (signal: NodeJS.Signals) => {
     if (stopping) return;
     stopping = true;
     console.log(`Received ${signal}, stopping bot...`);
+    heartbeat.stop();
     bot.stop();
   };
 
@@ -33,6 +37,7 @@ async function main() {
       },
     });
   } finally {
+    heartbeat.stop();
     process.removeListener('SIGINT', onSigint);
     process.removeListener('SIGTERM', onSigterm);
   }
