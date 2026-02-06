@@ -10,6 +10,7 @@ import type { DataRepo } from '../git/sync.js';
 import { readBacklog, requeueInProgressTasks, updateTask } from '../project/backlog.js';
 import { readProject, writeProject } from '../project/project.js';
 import { findSectionBySlug, readSchema } from '../project/schema.js';
+import { generateAstroContentArtifacts } from '../site/generate.js';
 import { runResearchTask } from './agent.js';
 
 interface HeartbeatDependencies {
@@ -58,6 +59,7 @@ async function runHeartbeatCycle(input: HeartbeatDependencies): Promise<void> {
     project.status = 'completed';
     project.updatedAt = new Date().toISOString();
     await writeProject(input.repo, project);
+    await generateAstroContentArtifacts(input.repo);
     await input.repo.commitAndPush('Mark project completed: no queued tasks remain');
     await safeNotify(
       () =>
@@ -103,6 +105,7 @@ async function runHeartbeatCycle(input: HeartbeatDependencies): Promise<void> {
 
     project.updatedAt = researchedAt;
     await writeProject(input.repo, project);
+    await generateAstroContentArtifacts(input.repo);
     await input.repo.commitAndPush(`Complete research task: ${task.title}`);
     await safeNotify(
       () =>
@@ -123,6 +126,11 @@ async function runHeartbeatCycle(input: HeartbeatDependencies): Promise<void> {
     await updateTask(input.repo, task.id, { status: 'failed' });
     project.updatedAt = new Date().toISOString();
     await writeProject(input.repo, project);
+    try {
+      await generateAstroContentArtifacts(input.repo);
+    } catch (artifactsError) {
+      console.error(`[heartbeat] failed to generate site artifacts after task failure ${task.id}:`, artifactsError);
+    }
     await input.repo.commitAndPush(`Mark research task failed: ${task.title}`);
     await safeNotify(
       () =>

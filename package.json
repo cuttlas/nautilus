@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "data:reset": "tsx src/scripts/reset-data.ts",
     "env:save": "cp .env ~/.nautilus-env && echo 'Saved .env to ~/.nautilus-env'",
     "env:restore": "cp ~/.nautilus-env .env && echo 'Restored .env from ~/.nautilus-env'"
   },
