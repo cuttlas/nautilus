@@ -1,5 +1,5 @@
 import { simpleGit, type SimpleGit } from 'simple-git';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
@@ -11,6 +11,7 @@ export interface DataRepo {
   writeJSON(filePath: string, data: unknown): Promise<void>;
   readFile(filePath: string): Promise<string>;
   writeFile(filePath: string, content: string): Promise<void>;
+  removePath(filePath: string): Promise<void>;
   commitAndPush(message: string): Promise<void>;
   getLocalPath(): string;
 }
@@ -97,6 +98,13 @@ async function initDataRepo(config: NautilusConfig): Promise<DataRepo> {
     });
   }
 
+  async function removePathImpl(filePath: string): Promise<void> {
+    return enqueue(async () => {
+      const fullPath = join(localPath, filePath);
+      await rm(fullPath, { recursive: true, force: true });
+    });
+  }
+
   async function commitAndPush(message: string): Promise<void> {
     return enqueue(async () => {
       await pullIfRemoteMainExists();
@@ -120,6 +128,7 @@ async function initDataRepo(config: NautilusConfig): Promise<DataRepo> {
     writeJSON: writeJSONImpl,
     readFile: readFileImpl,
     writeFile: writeFileImpl,
+    removePath: removePathImpl,
     commitAndPush,
     getLocalPath,
   };

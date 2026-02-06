@@ -2,6 +2,7 @@ import { conversations, createConversation } from '@grammyjs/conversations';
 import { Bot } from 'grammy';
 import { registerAddCommand } from './commands/add.js';
 import { createScopingConversation, registerNewCommand, SCOPING_CONVERSATION } from './commands/new.js';
+import { registerSiteCommand } from './commands/site.js';
 import type { BotDependencies, NautilusBotContext } from './types.js';
 
 function contextTag(ctx: NautilusBotContext): string {
@@ -37,6 +38,7 @@ export function createBot(deps: BotDependencies): Bot<NautilusBotContext> {
   bot.use(createConversation(scopingConversation, SCOPING_CONVERSATION));
 
   registerNewCommand(bot, deps);
+  registerSiteCommand(bot, deps);
   registerAddCommand(bot, deps);
 
   bot.command('help', async (ctx) => {
@@ -45,6 +47,7 @@ export function createBot(deps: BotDependencies): Bot<NautilusBotContext> {
       [
         'Available commands:',
         '/new <topic> - create a new scoped research project',
+        '/site - show the current project site URL',
         '/add <topic> - add a research topic to the backlog',
         '/help - show this help message',
       ].join('\n'),

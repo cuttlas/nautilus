@@ -14,6 +14,8 @@ import {
   SCOPING_TASKS_SYSTEM_PROMPT,
 } from '../research/prompts.js';
 import type { DocumentSchema, Project } from '../types.js';
+import { generateAstroContentArtifacts } from '../site/generate.js';
+import { scaffoldAstroSite } from '../site/scaffold.js';
 import { setQueuedTasks } from './backlog.js';
 import { writeProject } from './project.js';
 import { writeSchema } from './schema.js';
@@ -370,6 +372,11 @@ function assignGeneratedTasks(
   }
 }
 
+async function purgePreviousProjectContent(repo: DataRepo): Promise<void> {
+  await repo.removePath('content');
+  await repo.removePath('site');
+}
+
 export async function runScopingConversation(input: {
   config: NautilusConfig;
   topic: string;
@@ -430,6 +437,7 @@ export async function finalizeScoping(
   });
 
   assignGeneratedTasks(sectionDefs, taskObject.tasks);
+  await purgePreviousProjectContent(repo);
 
   const flattenedTasks = buildFlattenedTasks(sectionDefs);
   const queuedTasks = await setQueuedTasks(repo, flattenedTasks);
@@ -457,6 +465,8 @@ export async function finalizeScoping(
   };
 
   await writeProject(repo, project);
+  await scaffoldAstroSite(repo);
+  await generateAstroContentArtifacts(repo);
 
   const sections = schema.sections.map((section) => ({
     title: section.title,
