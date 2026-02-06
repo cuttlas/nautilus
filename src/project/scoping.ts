@@ -1,9 +1,9 @@
-import { anthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import type { NautilusConfig } from '../config.js';
 import type { DataRepo } from '../git/sync.js';
+import { resolveLanguageModel } from '../llm/provider.js';
 import {
   buildScopingPlanPrompt,
   buildScopingRetryPrompt,
@@ -149,7 +149,7 @@ async function generateObjectWithRetry<T>(input: {
 }): Promise<T> {
   try {
     const { object } = await generateObject({
-      model: anthropic(input.config.defaultModel),
+      model: resolveLanguageModel(input.config),
       schema: input.schema,
       system: input.system,
       prompt: input.primaryPrompt,
@@ -159,7 +159,7 @@ async function generateObjectWithRetry<T>(input: {
     console.warn(`[scoping] ${input.retryLabel} validation failed; retrying once`, firstError);
 
     const { object } = await generateObject({
-      model: anthropic(input.config.defaultModel),
+      model: resolveLanguageModel(input.config),
       schema: input.schema,
       system: input.system,
       prompt: buildScopingRetryPrompt({
@@ -377,7 +377,7 @@ export async function runScopingConversation(input: {
   askedQuestions: number;
 }): Promise<ScopingTurnResult> {
   const { object } = await generateObject({
-    model: anthropic(input.config.defaultModel),
+    model: resolveLanguageModel(input.config),
     schema: scopingTurnSchema,
     system: SCOPING_SYSTEM_PROMPT,
     prompt: buildScopingTurnPrompt({
