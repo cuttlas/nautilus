@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createBot } from './bot/bot.js';
 import { loadConfig } from './config.js';
 import { getDataRepo } from './git/sync.js';
+import { startBlindspotHeartbeat } from './blindspot/heartbeat.js';
 import { startHeartbeat } from './research/heartbeat.js';
 
 async function main() {
@@ -15,6 +16,7 @@ async function main() {
 
   const bot = createBot({ config, repo });
   const heartbeat = startHeartbeat({ config, repo, bot });
+  const blindspotHeartbeat = startBlindspotHeartbeat({ config, repo, bot });
 
   let stopping = false;
   const stopBot = (signal: NodeJS.Signals) => {
@@ -22,6 +24,7 @@ async function main() {
     stopping = true;
     console.log(`Received ${signal}, stopping bot...`);
     heartbeat.stop();
+    blindspotHeartbeat.stop();
     bot.stop();
   };
 
@@ -38,6 +41,7 @@ async function main() {
     });
   } finally {
     heartbeat.stop();
+    blindspotHeartbeat.stop();
     process.removeListener('SIGINT', onSigint);
     process.removeListener('SIGTERM', onSigterm);
   }

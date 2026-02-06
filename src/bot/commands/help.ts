@@ -20,6 +20,7 @@ export function registerHelpCommand(bot: Bot<NautilusBotContext>): void {
         '/pause - pause the research heartbeat',
         '/resume - resume the research heartbeat',
         '/backlog - show pending tasks',
+        '/blindspot - suggest research gaps',
         '/help - show this message',
       ].join('\n'),
     );

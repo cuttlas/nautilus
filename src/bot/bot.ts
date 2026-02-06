@@ -2,6 +2,7 @@ import { conversations, createConversation } from '@grammyjs/conversations';
 import { Bot } from 'grammy';
 import { registerAddCommand } from './commands/add.js';
 import { registerBacklogCommand } from './commands/backlog.js';
+import { registerBlindspotCommand } from './commands/blindspot.js';
 import { registerHelpCommand } from './commands/help.js';
 import { createScopingConversation, registerNewCommand, SCOPING_CONVERSATION } from './commands/new.js';
 import { registerPauseCommand } from './commands/pause.js';
@@ -49,6 +50,7 @@ export function createBot(deps: BotDependencies): Bot<NautilusBotContext> {
   registerPauseCommand(bot, deps);
   registerResumeCommand(bot, deps);
   registerBacklogCommand(bot, deps);
+  registerBlindspotCommand(bot, deps);
   registerHelpCommand(bot);
 
   bot.catch((err) => {
