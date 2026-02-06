@@ -31,12 +31,31 @@ async function initDataRepo(config: NautilusConfig): Promise<DataRepo> {
   }
 
   let git: SimpleGit;
+  const syncBranch = 'main';
+
+  function isMissingRemoteMainRefError(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      (error.message.includes("couldn't find remote ref main") ||
+        error.message.includes('could not find remote branch main'))
+    );
+  }
+
+  async function pullIfRemoteMainExists(): Promise<void> {
+    try {
+      await git.pull('origin', syncBranch);
+    } catch (error) {
+      if (!isMissingRemoteMainRefError(error)) {
+        throw error;
+      }
+    }
+  }
 
   async function ensureRepo(): Promise<void> {
     return enqueue(async () => {
       if (existsSync(join(localPath, '.git'))) {
         git = simpleGit(localPath);
-        await git.pull('origin', 'main');
+        await pullIfRemoteMainExists();
       } else {
         await mkdir(dirname(localPath), { recursive: true });
         await simpleGit().clone(remoteUrl, localPath);
@@ -80,12 +99,12 @@ async function initDataRepo(config: NautilusConfig): Promise<DataRepo> {
 
   async function commitAndPush(message: string): Promise<void> {
     return enqueue(async () => {
-      await git.pull('origin', 'main');
+      await pullIfRemoteMainExists();
       await git.add('.');
       const status = await git.status();
       if (status.files.length === 0) return;
       await git.commit(message);
-      await git.push('origin', 'main');
+      await git.raw(['push', '--set-upstream', 'origin', syncBranch]);
     });
   }
 
