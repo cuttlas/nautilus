@@ -32,23 +32,39 @@ export async function addTask(
   return task;
 }
 
+function createQueuedTask(input: {
+  title: string;
+  description: string;
+  category: string;
+}): ResearchTask {
+  return {
+    id: uuidv4(),
+    title: input.title,
+    description: input.description,
+    category: input.category,
+    status: 'queued',
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export async function addTasks(
   repo: DataRepo,
   inputs: Array<{ title: string; description: string; category: string }>,
 ): Promise<ResearchTask[]> {
   const backlog = await readBacklog(repo);
-
-  const tasks: ResearchTask[] = inputs.map((input) => ({
-    id: uuidv4(),
-    title: input.title,
-    description: input.description,
-    category: input.category,
-    status: 'queued' as const,
-    createdAt: new Date().toISOString(),
-  }));
+  const tasks: ResearchTask[] = inputs.map(createQueuedTask);
 
   backlog.tasks.push(...tasks);
   await repo.writeJSON(BACKLOG_FILE, backlog);
+  return tasks;
+}
+
+export async function setQueuedTasks(
+  repo: DataRepo,
+  inputs: Array<{ title: string; description: string; category: string }>,
+): Promise<ResearchTask[]> {
+  const tasks = inputs.map(createQueuedTask);
+  await repo.writeJSON(BACKLOG_FILE, { tasks } satisfies Backlog);
   return tasks;
 }
 
