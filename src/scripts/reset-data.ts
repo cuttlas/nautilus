@@ -54,6 +54,7 @@ function buildResetConfig(dataRepoUrl: string, githubToken: string): NautilusCon
     heartbeatIntervalMinutes: 30,
     maxStepsPerTask: 25,
     siteUrl: 'https://example.pages.dev',
+    blindspotIntervalMinutes: 120,
   };
 }
 

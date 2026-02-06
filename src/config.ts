@@ -12,6 +12,7 @@ export interface NautilusConfig {
   heartbeatIntervalMinutes: number;
   maxStepsPerTask: number;
   siteUrl: string;
+  blindspotIntervalMinutes: number;
 }
 
 const configSchema = z
@@ -27,6 +28,7 @@ const configSchema = z
     DEFAULT_MODEL: z.string().default('gemini-2.5-flash'),
     HEARTBEAT_INTERVAL_MINUTES: z.coerce.number().int().positive().default(30),
     MAX_STEPS_PER_TASK: z.coerce.number().int().positive().default(25),
+    BLINDSPOT_INTERVAL_MINUTES: z.coerce.number().int().positive().default(120),
   })
   .superRefine((value, ctx) => {
     const model = value.DEFAULT_MODEL.trim().toLowerCase();
@@ -67,6 +69,7 @@ export function loadConfig(): NautilusConfig {
     heartbeatIntervalMinutes: parsed.HEARTBEAT_INTERVAL_MINUTES,
     maxStepsPerTask: parsed.MAX_STEPS_PER_TASK,
     siteUrl: parsed.SITE_URL,
+    blindspotIntervalMinutes: parsed.BLINDSPOT_INTERVAL_MINUTES,
   };
 
   return _config;
